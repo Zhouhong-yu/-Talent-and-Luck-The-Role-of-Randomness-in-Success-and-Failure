@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Talent vs Luck — 天赋与运气的交互式模拟</title>
+<style>
+  :root {
+    --bg: #0f1119;
+    --panel: #1a1d2e;
+    --border: #2a2d3e;
+    --text: #c8ccd4;
+    --text-dim: #7a7f8e;
+    --accent: #5b9bd5;
+    --lucky: #4caf84;
+    --unlucky: #e0556a;
+    --gold: #e2b04a;
+    --capital-high: #e2b04a;
+    --capital-mid: #5b9bd5;
+    --capital-low: #4a4a6a;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    user-select: none;
+  }
+
+  /* Header */
+  #header {
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    padding: 8px 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-shrink: 0;
+  }
+
+  #header h1 {
+    font-size: 18px;
+    font-weight: 600;
+    background: linear-gradient(135deg, var(--gold), var(--accent));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  #header .subtitle {
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+
+  .key-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0 16px;
+    border-left: 1px solid var(--border);
+  }
+
+  .key-stat .value {
+    font-size: 20px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    font-family: 'JetBrains Mono', 'Cascadia Code', 'Consolas', monospace;
+  }
+
+  .key-stat .value.gold { color: var(--gold); }
+  .key-stat .value.accent { color: var(--accent); }
+  .key-stat .value.lucky { color: var(--lucky); }
+
+  .key-stat .label {
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+
+  /* Main layout */
+  #main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* Left panel */
+  #controls {
+    width: 280px;
+    flex-shrink: 0;
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  #controls h3 {
+    font-size: 13px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: -8px;
+  }
+
+  .control-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .control-group label {
+    font-size: 12px;
+    color: var(--text-dim);
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .control-group label span.val {
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  .control-group input[type="range"] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    outline: none;
+  }
+
+  .control-group input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    background: var(--accent);
+    border-radius: 50%;
+    cursor: pointer;
+  }
+
+  .control-group select {
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    padding: 6px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+    outline: none;
+  }
+
+  .control-group select:focus {
+    border-color: var(--accent);
+  }
+
+  .btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: inherit;
+  }
+
+  .btn:hover { filter: brightness(1.15); }
+  .btn:active { transform: scale(0.97); }
+
+  .btn-run {
+    background: var(--lucky);
+    color: #fff;
+  }
+
+  .btn-fast {
+    background: var(--accent);
+    color: #fff;
+  }
+
+  .btn-reset {
+    background: var(--border);
+    color: var(--text);
+  }
+
+  .btn-pause {
+    background: var(--gold);
+    color: #1a1a1a;
+  }
+
+  .button-row {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .button-row .btn { flex: 1; min-width: 60px; }
+
+  /* Center - simulation view */
+  #center {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  #sim-canvas-wrap {
+    flex: 1;
+    position: relative;
+    background: #0a0c14;
+    min-height: 300px;
+  }
+
+  #simCanvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  .sim-overlay {
+    position: absolute;
+    top: 12px;
+    right: 16px;
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+
+  .sim-overlay .year {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--text);
+    display: block;
+    line-height: 1;
+  }
+
+  /* Right panel - charts */
+  #charts {
+    width: 400px;
+    flex-shrink: 0;
+    background: var(--panel);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    padding: 12px;
+    gap: 12px;
+  }
+
+  .chart-box {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .chart-box h4 {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    text-align: center;
+  }
+
+  .chart-box canvas {
+    width: 100%;
+    height: auto;
+    flex: 1;
+    min-height: 140px;
+  }
+
+  /* Legend */
+  .legend {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    font-size: 11px;
+    margin-top: 4px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+
+  .legend-dot.lucky { background: var(--lucky); }
+  .legend-dot.unlucky { background: var(--unlucky); }
+  .legend-dot.cap-high { background: var(--capital-high); }
+  .legend-dot.cap-mid { background: var(--capital-mid); }
+  .legend-dot.cap-low { background: var(--capital-low); }
+
+  /* Insight banner */
+  .insight {
+    background: linear-gradient(135deg, rgba(226,176,74,0.1), rgba(91,155,213,0.1));
+    border: 1px solid rgba(226,176,74,0.25);
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 12px;
+    color: var(--gold);
+    text-align: center;
+    min-height: 20px;
+    transition: opacity 0.3s;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  /* Responsive */
+  @media (max-width: 1200px) {
+    #controls { width: 240px; }
+    #charts { width: 320px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="header">
+  <div>
+    <h1>Talent vs Luck</h1>
+    <div class="subtitle">基于 Pluchino, Biondo, Rapisarda (2018) 的 Agent 模拟</div>
+  </div>
+  <div style="flex:1"></div>
+  <div class="key-stat">
+    <span class="value gold" id="stat-best">10</span>
+    <span class="label">最高财富</span>
+  </div>
+  <div class="key-stat">
+    <span class="value accent" id="stat-best-talent">-</span>
+    <span class="label">首富天赋值</span>
+  </div>
+  <div class="key-stat">
+    <span class="value lucky" id="stat-top20">-</span>
+    <span class="label">Top 20% 财富占比</span>
+  </div>
+  <div class="key-stat">
+    <span class="value" id="stat-year" style="color:var(--text)">0</span>
+    <span class="label">模拟年份</span>
+  </div>
+</div>
+
+<div id="main">
+  <!-- Left: Controls -->
+  <div id="controls">
+    <h3>模拟参数</h3>
+
+    <div class="control-group">
+      <label>人口数量 N <span class="val" id="val-n">1000</span></label>
+      <input type="range" id="param-n" min="100" max="2000" value="1000" step="100">
+    </div>
+
+    <div class="control-group">
+      <label>事件数量 NE <span class="val" id="val-ne">500</span></label>
+      <input type="range" id="param-ne" min="100" max="1000" value="500" step="50">
+    </div>
+
+    <div class="control-group">
+      <label>幸运事件比例 pL <span class="val" id="val-pl">50%</span></label>
+      <input type="range" id="param-pl" min="10" max="90" value="50" step="5">
+    </div>
+
+    <div class="control-group">
+      <label>平均天赋 mT <span class="val" id="val-mt">0.60</span></label>
+      <input type="range" id="param-mt" min="0.3" max="0.9" value="0.6" step="0.05">
+    </div>
+
+    <div class="control-group">
+      <label>天赋标准差 σT <span class="val" id="val-st">0.10</span></label>
+      <input type="range" id="param-st" min="0.05" max="0.3" value="0.1" step="0.05">
+    </div>
+
+    <div class="control-group">
+      <label>初始资金 C(0) <span class="val" id="val-c0">10</span></label>
+      <input type="range" id="param-c0" min="1" max="100" value="10" step="1">
+    </div>
+
+    <h3>资助策略 (每5年)</h3>
+
+    <div class="control-group">
+      <label>策略</label>
+      <select id="param-funding">
+        <option value="none">无资助</option>
+        <option value="egalitarian">平等分配 (Egalitarian)</option>
+        <option value="elitarian">精英分配 (Elitarian)</option>
+        <option value="mixed">混合分配 (Mixed)</option>
+        <option value="random">随机分配 (Random)</option>
+      </select>
+    </div>
+
+    <div class="control-group">
+      <label>总资助金额 FT <span class="val" id="val-ft">8000</span></label>
+      <input type="range" id="param-ft" min="1000" max="40000" value="8000" step="500">
+    </div>
+
+    <div class="control-group">
+      <label>资助比例 <span class="val" id="val-fp">25%</span></label>
+      <input type="range" id="param-fp" min="5" max="100" value="25" step="5">
+    </div>
+
+    <h3>控制</h3>
+
+    <div class="button-row">
+      <button class="btn btn-run" id="btn-run">▶ 逐步运行</button>
+      <button class="btn btn-fast" id="btn-fast">⏩ 快速完成</button>
+    </div>
+    <div class="button-row">
+      <button class="btn btn-pause" id="btn-auto">▶ 自动运行</button>
+      <button class="btn btn-reset" id="btn-reset">↺ 重置</button>
+    </div>
+
+    <div class="insight" id="insight">
+      调整参数，点击"自动运行"开始模拟
+    </div>
+  </div>
+
+  <!-- Center: Simulation View -->
+  <div id="center">
+    <div id="sim-canvas-wrap">
+      <canvas id="simCanvas"></canvas>
+      <div class="sim-overlay">
+        <span class="year" id="overlay-year">第 0 年</span>
+        共 40 年 · 每步=6个月
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: Charts -->
+  <div id="charts">
+    <div class="chart-box" style="flex:1">
+      <h4>财富分布 (对数-对数)</h4>
+      <canvas id="chartDist"></canvas>
+    </div>
+    <div class="chart-box" style="flex:1">
+      <h4>天赋 vs 财富</h4>
+      <canvas id="chartTalent"></canvas>
+      <div class="legend">
+        <span class="legend-item"><span class="legend-dot cap-high"></span> 高财富</span>
+        <span class="legend-item"><span class="legend-dot cap-mid"></span> 中财富</span>
+        <span class="legend-item"><span class="legend-dot cap-low"></span> 低财富</span>
+      </div>
+    </div>
+    <div class="chart-box" style="flex:1">
+      <h4>运气事件 vs 财富</h4>
+      <canvas id="chartLuck"></canvas>
+      <div class="legend">
+        <span class="legend-item"><span class="legend-dot lucky"></span> 幸运事件</span>
+        <span class="legend-item"><span class="legend-dot unlucky"></span> 不幸事件</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="simulation.js"></script>
+<script>
+// ============================================================
+// Main Controller
+// ============================================================
+
+const simCanvas = document.getElementById('simCanvas');
+const simCtx = simCanvas.getContext('2d');
+
+const chartDistCanvas = document.getElementById('chartDist');
+const chartDistCtx = chartDistCanvas.getContext('2d');
+
+const chartTalentCanvas = document.getElementById('chartTalent');
+const chartTalentCtx = chartTalentCanvas.getContext('2d');
+
+const chartLuckCanvas = document.getElementById('chartLuck');
+const chartLuckCtx = chartLuckCanvas.getContext('2d');
+
+// --- Read params ---
+function getParams() {
+  return {
+    N: parseInt(document.getElementById('param-n').value),
+    NE: parseInt(document.getElementById('param-ne').value),
+    pL: parseInt(document.getElementById('param-pl').value) / 100,
+    mT: parseFloat(document.getElementById('param-mt').value),
+    sigmaT: parseFloat(document.getElementById('param-st').value),
+    initialCapital: parseInt(document.getElementById('param-c0').value),
+    worldSize: 201,
+    totalSteps: 80,
+  };
+}
+
+function getFundingConfig() {
+  const strategy = document.getElementById('param-funding').value;
+  if (strategy === 'none') return { strategy: null, amount: 0 };
+  return {
+    strategy,
+    amount: parseInt(document.getElementById('param-ft').value),
+    targetPct: parseInt(document.getElementById('param-fp').value) / 100,
+  };
+}
+
+// --- Create simulation ---
+let sim = new Simulation(getParams());
+const funding = getFundingConfig();
+sim.fundingStrategy = funding.strategy;
+sim.fundingAmount = funding.amount;
+if (funding.targetPct !== undefined) sim.fundingTargetPct = funding.targetPct;
+
+let autoRunTimer = null;
+let isAutoRunning = false;
+
+// --- Resize handler ---
+function resizeCanvases() {
+  const wrap = document.getElementById('sim-canvas-wrap');
+  const rect = wrap.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+
+  simCanvas.width = rect.width * dpr;
+  simCanvas.height = rect.height * dpr;
+  simCanvas.style.width = rect.width + 'px';
+  simCanvas.style.height = rect.height + 'px';
+
+  for (const [el, ctx] of [
+    [chartDistCanvas, chartDistCtx],
+    [chartTalentCanvas, chartTalentCtx],
+    [chartLuckCanvas, chartLuckCtx],
+  ]) {
+    const r = el.parentElement.getBoundingClientRect();
+    el.width = r.width * dpr;
+    el.height = (r.height - 30) * dpr;
+    el.style.width = r.width + 'px';
+    el.style.height = (r.height - 30) + 'px';
+  }
+}
+
+window.addEventListener('resize', resizeCanvases);
+
+// --- Drawing ---
+function getAgentColor(capital, maxCap) {
+  if (maxCap <= 0) return '#4a4a6a';
+  const t = Math.log(1 + capital) / Math.log(1 + maxCap);
+  if (t > 0.66) return '#e2b04a';
+  if (t > 0.33) return '#5b9bd5';
+  return '#4a4a6a';
+}
+
+function drawSimulation() {
+  const { width, height } = simCanvas;
+  const ctx = simCtx;
+  const dpr = window.devicePixelRatio || 1;
+
+  ctx.clearRect(0, 0, width, height);
+  ctx.fillStyle = '#0a0c14';
+  ctx.fillRect(0, 0, width, height);
+
+  const scaleX = width / sim.worldSize;
+  const scaleY = height / sim.worldSize;
+
+  // Draw events
+  for (const evt of sim.events) {
+    ctx.beginPath();
+    ctx.arc(evt.x * scaleX, evt.y * scaleY, Math.max(1.5 * dpr, 2), 0, Math.PI * 2);
+    ctx.fillStyle = evt.type === 'lucky'
+      ? 'rgba(76,175,132,0.6)'
+      : 'rgba(224,85,106,0.5)';
+    ctx.fill();
+  }
+
+  // Determine max capital for coloring
+  let maxCap = 0;
+  for (const a of sim.agents) {
+    if (a.capital > maxCap) maxCap = a.capital;
+  }
+
+  // Draw agents
+  const agentRadius = Math.max(2 * dpr, 2.5);
+  for (const a of sim.agents) {
+    ctx.beginPath();
+    ctx.arc(a.x * scaleX, a.y * scaleY, agentRadius, 0, Math.PI * 2);
+    ctx.fillStyle = getAgentColor(a.capital, maxCap);
+    ctx.fill();
+  }
+}
+
+function drawDistributionChart() {
+  const canvas = chartDistCanvas;
+  const ctx = chartDistCtx;
+  const dpr = window.devicePixelRatio || 1;
+  const { width, height } = canvas;
+  ctx.clearRect(0, 0, width, height);
+
+  if (!sim.stats) return;
+  const dist = sim.stats.capitalDist;
+
+  const pad = { l: 50 * dpr, r: 16 * dpr, t: 16 * dpr, b: 32 * dpr };
+  const pw = width - pad.l - pad.r;
+  const ph = height - pad.t - pad.b;
+
+  // Background
+  ctx.fillStyle = '#0f1119';
+  ctx.fillRect(0, 0, width, height);
+
+  // Grid
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 5; i++) {
+    const y = pad.t + ph * i / 5;
+    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(width - pad.r, y); ctx.stroke();
+    const x = pad.l + pw * i / 5;
+    ctx.beginPath(); ctx.moveTo(x, pad.t); ctx.lineTo(x, height - pad.b); ctx.stroke();
+  }
+
+  if (dist.edges.length < 2) return;
+
+  const maxCount = Math.max(1, ...dist.counts);
+  const edges = dist.edges;
+  const binWidths = [];
+  for (let i = 0; i < dist.counts.length; i++) {
+    binWidths.push(edges[i + 1] - edges[i]);
+  }
+
+  // Bars
+  for (let i = 0; i < dist.counts.length; i++) {
+    if (dist.counts[i] === 0) continue;
+    const x1 = pad.l + (Math.log(edges[i]) - Math.log(edges[0])) /
+                     (Math.log(edges[edges.length - 1]) - Math.log(edges[0])) * pw;
+    const x2 = pad.l + (Math.log(edges[i + 1]) - Math.log(edges[0])) /
+                     (Math.log(edges[edges.length - 1]) - Math.log(edges[0])) * pw;
+    const barH = Math.max(1, (dist.counts[i] / maxCount) * ph);
+    const y = pad.t + ph - barH;
+
+    const alpha = 0.6 + 0.4 * (i / dist.counts.length);
+    ctx.fillStyle = `rgba(91,155,213,${alpha})`;
+    ctx.fillRect(x1, y, Math.max(2, x2 - x1 - 1), barH);
+  }
+
+  // Power law reference line
+  ctx.strokeStyle = 'rgba(226,176,74,0.5)';
+  ctx.lineWidth = 1.5 * dpr;
+  ctx.setLineDash([4 * dpr, 4 * dpr]);
+  ctx.beginPath();
+  const refY0 = pad.t + ph;
+  const refX0 = pad.l + pw * 0.1;
+  const refY1 = pad.t + ph * 0.05;
+  const refX1 = pad.l + pw * 0.9;
+  ctx.moveTo(refX0, refY0);
+  ctx.lineTo(refX1, refY1);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Axes labels
+  ctx.fillStyle = '#7a7f8e';
+  ctx.font = `${10 * dpr}px "Segoe UI", sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.fillText('财富 (log)', pad.l + pw / 2, height - 4 * dpr);
+  ctx.save();
+  ctx.translate(10 * dpr, pad.t + ph / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillText('人数 (log)', 0, 0);
+  ctx.restore();
+}
+
+function drawTalentChart() {
+  const canvas = chartTalentCanvas;
+  const ctx = chartTalentCtx;
+  const dpr = window.devicePixelRatio || 1;
+  const { width, height } = canvas;
+  ctx.clearRect(0, 0, width, height);
+
+  if (!sim.stats) return;
+
+  const pad = { l: 44 * dpr, r: 16 * dpr, t: 12 * dpr, b: 28 * dpr };
+  const pw = width - pad.l - pad.r;
+  const ph = height - pad.t - pad.b;
+
+  ctx.fillStyle = '#0f1119';
+  ctx.fillRect(0, 0, width, height);
+
+  // Grid
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const y = pad.t + ph * i / 4;
+    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(width - pad.r, y); ctx.stroke();
+    const x = pad.l + pw * i / 4;
+    ctx.beginPath(); ctx.moveTo(x, pad.t); ctx.lineTo(x, height - pad.b); ctx.stroke();
+  }
+
+  const maxCap = Math.max(1, ...sim.stats.capitals);
+
+  for (let i = 0; i < sim.agents.length; i++) {
+    const a = sim.agents[i];
+    const x = pad.l + a.talent * pw;
+    const logCap = Math.log(1 + a.capital) / Math.log(1 + maxCap);
+    const y = pad.t + (1 - logCap) * ph;
+
+    ctx.beginPath();
+    ctx.arc(x, y, Math.max(2 * dpr, 2), 0, Math.PI * 2);
+
+    if (a.capital > maxCap * 0.5) {
+      ctx.fillStyle = 'rgba(226,176,74,0.8)';
+    } else if (a.capital > maxCap * 0.1) {
+      ctx.fillStyle = 'rgba(91,155,213,0.5)';
+    } else {
+      ctx.fillStyle = 'rgba(74,74,106,0.3)';
+    }
+    ctx.fill();
+  }
+
+  // Highlight best performer
+  if (sim.stats.bestAgent) {
+    const ba = sim.stats.bestAgent;
+    const bx = pad.l + ba.talent * pw;
+    const blogCap = Math.log(1 + ba.capital) / Math.log(1 + maxCap);
+    const by = pad.t + (1 - blogCap) * ph;
+
+    ctx.beginPath();
+    ctx.arc(bx, by, 6 * dpr, 0, Math.PI * 2);
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2 * dpr;
+    ctx.stroke();
+  }
+
+  // mT line
+  ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([2 * dpr, 4 * dpr]);
+  const mTx = pad.l + sim.mT * pw;
+  ctx.beginPath(); ctx.moveTo(mTx, pad.t); ctx.lineTo(mTx, height - pad.b); ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.fillStyle = 'rgba(255,255,255,0.4)';
+  ctx.font = `${9 * dpr}px "Segoe UI", sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.fillText('mT', mTx, pad.t - 2 * dpr);
+
+  ctx.fillStyle = '#7a7f8e';
+  ctx.textAlign = 'center';
+  ctx.fillText('天赋值', pad.l + pw / 2, height - 4 * dpr);
+  ctx.save();
+  ctx.translate(8 * dpr, pad.t + ph / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillText('财富 (log)', 0, 0);
+  ctx.restore();
+}
+
+function drawLuckChart() {
+  const canvas = chartLuckCanvas;
+  const ctx = chartLuckCtx;
+  const dpr = window.devicePixelRatio || 1;
+  const { width, height } = canvas;
+  ctx.clearRect(0, 0, width, height);
+
+  if (!sim.stats) return;
+
+  const pad = { l: 44 * dpr, r: 16 * dpr, t: 12 * dpr, b: 28 * dpr };
+  const pw = width - pad.l - pad.r;
+  const ph = height - pad.t - pad.b;
+
+  ctx.fillStyle = '#0f1119';
+  ctx.fillRect(0, 0, width, height);
+
+  // Grid
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const y = pad.t + ph * i / 4;
+    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(width - pad.r, y); ctx.stroke();
+    const x = pad.l + pw * i / 4;
+    ctx.beginPath(); ctx.moveTo(x, pad.t); ctx.lineTo(x, height - pad.b); ctx.stroke();
+  }
+
+  const maxEvents = Math.max(1, ...sim.stats.luckyCounts, ...sim.stats.unluckyCounts);
+  const maxCap = Math.max(1, ...sim.stats.capitals);
+
+  for (let i = 0; i < sim.agents.length; i++) {
+    const a = sim.agents[i];
+    const logCap = Math.log(1 + a.capital) / Math.log(1 + maxCap);
+    const cx = pad.l + logCap * pw;
+
+    // Lucky events
+    const ly = pad.t + (1 - a.luckyEvents / maxEvents) * ph;
+    ctx.beginPath();
+    ctx.arc(cx, ly, Math.max(1.8 * dpr, 1.5), 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(76,175,132,0.55)';
+    ctx.fill();
+
+    // Unlucky events
+    const uy = pad.t + (1 - a.unluckyEvents / maxEvents) * ph;
+    ctx.beginPath();
+    ctx.arc(cx, uy, Math.max(1.8 * dpr, 1.5), 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(224,85,106,0.5)';
+    ctx.fill();
+  }
+
+  ctx.fillStyle = '#7a7f8e';
+  ctx.font = `${9 * dpr}px "Segoe UI", sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.fillText('财富 (log)', pad.l + pw / 2, height - 4 * dpr);
+  ctx.save();
+  ctx.translate(8 * dpr, pad.t + ph / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillText('事件数量', 0, 0);
+  ctx.restore();
+}
+
+// --- Render all ---
+function renderAll() {
+  resizeCanvases();
+  drawSimulation();
+  drawDistributionChart();
+  drawTalentChart();
+  drawLuckChart();
+  updateStats();
+}
+
+function updateStats() {
+  if (!sim.stats) return;
+
+  const s = sim.stats;
+  document.getElementById('stat-best').textContent = Math.floor(s.bestAgent.capital).toLocaleString();
+  document.getElementById('stat-best-talent').textContent = s.bestAgent.talent.toFixed(3);
+  document.getElementById('stat-top20').textContent = (s.top20Share * 100).toFixed(1) + '%';
+
+  const year = Math.floor(sim.currentStep / 2);
+  const age = 20 + year;
+  document.getElementById('stat-year').textContent = age + '岁';
+  document.getElementById('overlay-year').textContent = '第 ' + year + ' 年';
+
+  // Insight
+  const insight = document.getElementById('insight');
+  if (sim.currentStep >= sim.totalSteps) {
+    const bestT = s.bestAgent.talent;
+    const maxT = s.maxTalentAgent.talent;
+    if (bestT < maxT) {
+      insight.textContent = `最富有的人天赋仅 ${bestT.toFixed(2)}，而最有天赋的人 (${maxT.toFixed(2)}) 财富仅 ${Math.floor(s.maxTalentAgent.capital)}。运气比天赋更重要！`;
+    } else {
+      insight.textContent = `模拟完成。Top 20% 掌握 ${(s.top20Share*100).toFixed(0)}% 财富，呈帕累托分布。`;
+    }
+  }
+}
+
+// --- Actions ---
+function runStep() {
+  if (sim.currentStep >= sim.totalSteps) return;
+  sim.step();
+  renderAll();
+}
+
+function runFast() {
+  stopAuto();
+  while (sim.currentStep < sim.totalSteps) {
+    sim.step();
+  }
+  renderAll();
+}
+
+function startAuto() {
+  if (isAutoRunning) {
+    stopAuto();
+    return;
+  }
+  isAutoRunning = true;
+  document.getElementById('btn-auto').textContent = '⏸ 暂停';
+  document.getElementById('btn-auto').classList.add('btn-pause');
+  document.getElementById('btn-auto').classList.remove('btn-run');
+
+  function tick() {
+    if (!isAutoRunning) return;
+    if (sim.currentStep >= sim.totalSteps) {
+      stopAuto();
+      return;
+    }
+    // Run a few steps per frame for speed
+    for (let i = 0; i < 2; i++) {
+      if (sim.currentStep >= sim.totalSteps) break;
+      sim.step();
+    }
+    renderAll();
+    autoRunTimer = requestAnimationFrame(tick);
+  }
+  tick();
+}
+
+function stopAuto() {
+  isAutoRunning = false;
+  if (autoRunTimer) {
+    cancelAnimationFrame(autoRunTimer);
+    autoRunTimer = null;
+  }
+  document.getElementById('btn-auto').textContent = '▶ 自动运行';
+  document.getElementById('btn-auto').classList.add('btn-run');
+  document.getElementById('btn-auto').classList.remove('btn-pause');
+}
+
+function resetSim() {
+  stopAuto();
+  const params = getParams();
+  const funding = getFundingConfig();
+  sim = new Simulation(params);
+  sim.fundingStrategy = funding.strategy;
+  sim.fundingAmount = funding.amount;
+  if (funding.targetPct !== undefined) sim.fundingTargetPct = funding.targetPct;
+  renderAll();
+}
+
+// --- Events ---
+document.getElementById('btn-run').addEventListener('click', runStep);
+document.getElementById('btn-fast').addEventListener('click', runFast);
+document.getElementById('btn-auto').addEventListener('click', startAuto);
+document.getElementById('btn-reset').addEventListener('click', resetSim);
+
+// Slider value displays
+const sliders = {
+  'param-n': 'val-n',
+  'param-ne': 'val-ne',
+  'param-pl': 'val-pl',
+  'param-mt': 'val-mt',
+  'param-st': 'val-st',
+  'param-c0': 'val-c0',
+  'param-ft': 'val-ft',
+  'param-fp': 'val-fp',
+};
+
+for (const [sliderId, displayId] of Object.entries(sliders)) {
+  const slider = document.getElementById(sliderId);
+  const display = document.getElementById(displayId);
+  slider.addEventListener('input', () => {
+    let val = slider.value;
+    if (sliderId === 'param-pl' || sliderId === 'param-fp') val += '%';
+    else if (sliderId === 'param-mt' || sliderId === 'param-st') val = parseFloat(val).toFixed(2);
+    else if (sliderId === 'param-ft' || sliderId === 'param-c0') val = parseInt(val).toLocaleString();
+    display.textContent = val;
+  });
+}
+
+// Initial render
+setTimeout(() => {
+  renderAll();
+}, 100);
+
+window.addEventListener('resize', () => {
+  resizeCanvases();
+  drawSimulation();
+  drawDistributionChart();
+  drawTalentChart();
+  drawLuckChart();
+});
+</script>
+</body>
+</html>

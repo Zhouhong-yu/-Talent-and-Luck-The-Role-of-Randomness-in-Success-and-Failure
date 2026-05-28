@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pip install *)",
+      "Bash(python3 -c ' *)",
+      "Bash(python *)",
+      "Bash(where pdftotext *)",
+      "Bash(where python *)",
+      "Bash(pdftotext *)",
+      "Bash(node --check \"D:/zhy/ai/luck-vs-talent/simulation.js\")",
+      "WebSearch",
+      "WebFetch(domain:www.sohu.com)",
+      "WebFetch(domain:www.jinantimes.com.cn)",
+      "WebFetch(domain:tjj.weihai.gov.cn)"
+    ]
+  }
+}
